@@ -1,0 +1,46 @@
+# Default values for jamf.
+
+replicaCount: 1
+
+image:
+  repository: hb3b/jamf
+  tag: 10.11.1
+  pullPolicy: Always
+
+resources:
+  requests:
+    memory: 1000Mi
+
+# externalDatabase:
+#   host:
+#   user:
+#   password:
+#   database:
+
+memcached:
+  enabled: true
+  replicaCount: 1
+
+ingress:
+  enabled: true
+  annotations: {}
+  hosts:
+    - host: jamf.local
+      paths:
+        - /
+
+service:
+  annotations:
+    traefik.ingress.kubernetes.io/affinity: "true"
+
+# Temporary DB
+mariadb:
+  enabled: true
+  replication:
+    enabled: false
+  db:
+    name: jamfdb
+    user: jamfdb-user
+  master:
+    persistence:
+      enabled: false
