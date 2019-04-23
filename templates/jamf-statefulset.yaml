@@ -26,6 +26,54 @@ spec:
       volumes:
       - name: logs
         emptyDir: {}
+      initContainers:
+      - name: memcached-init
+        image: alpine:latest
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - 'i=1; while [[ $i -le 100 ]]; do nc -vz $MEMCACHED_HOST 11211; if [[ $? == 0 ]]; then echo "Memcached should now be started"; exit 0; fi; echo "Memcached starting... Attempt: $i of 100"; i=$((i+1)); sleep 1; done;echo "Memcached unable to be reached";exit 1;'
+        env:
+        - name: MEMCACHED_HOST
+          value: {{ template "jamf.memcached.fullname" . }}
+      - name: mysql-init
+        image: mysql
+        imagePullPolicy: Always
+        command:
+          - /bin/bash
+          - -c
+        args:
+          - 'for i in {0..120}; do mysql -u$DATABASE_USERNAME -p$DATABASE_PASSWORD -h$DATABASE_HOST -N -e "SELECT 1" &> /dev/null; if [[ $? == 0 ]]; then echo "MySQL should now be started"; exit 0; fi; echo "MySQL init process in progress... Attempt: $i of 120"; sleep 1; done;echo "MySQL failed to start in time";exit 1;'
+        env:
+          - name: DATABASE_HOST
+          {{- if .Values.mariadb.enabled }}
+            value: {{ template "jamf.mariadb.fullname" . }}
+          {{- else }}
+            value: {{ .Values.externalDatabase.host | quote }}
+          {{- end }}
+          - name: DATABASE_NAME
+          {{- if .Values.mariadb.enabled }}
+            value: {{ .Values.mariadb.db.name | quote }}
+          {{- else }}
+            value: {{ .Values.externalDatabase.database | quote }}
+          {{- end }}
+          - name: DATABASE_USERNAME
+          {{- if .Values.mariadb.enabled }}
+            value: {{ .Values.mariadb.db.user | quote }}
+          {{- else }}
+            value: {{ .Values.externalDatabase.user | quote }}
+          {{- end }}
+          - name: DATABASE_PASSWORD
+          {{- if .Values.mariadb.enabled }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "jamf.mariadb.fullname" . }}
+                key: mariadb-password
+          {{- else }}
+            value: {{ .Values.externalDatabase.password | quote }}
+          {{- end }}
       containers:
       - name: auditlog
         image: busybox
